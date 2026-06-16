@@ -1,0 +1,3 @@
+The merged, flashable firmware (bluedriver-merged.bin) is built and placed here
+automatically by the GitHub Actions "build" workflow, then published to the
+GitHub Pages web installer.

@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Install ESP32-BlueDriver</title>
+<script type="module"
+  src="https://unpkg.com/esp-web-tools@10/dist/web/install-button.js?module"></script>
+<style>
+  body{margin:0;font:16px/1.5 system-ui,Segoe UI,Roboto,sans-serif;
+       background:#0b0f17;color:#e6edf7;display:flex;justify-content:center}
+  .wrap{max-width:640px;padding:40px 22px}
+  h1{font-size:30px;margin:0 0 4px}
+  .sub{color:#8b9ac0;margin:0 0 26px}
+  .card{background:#141b2b;border:1px solid #26324d;border-radius:14px;padding:22px;margin:16px 0}
+  ol{padding-left:20px} li{margin:7px 0}
+  a{color:#3da9fc}
+  code{background:#0a0e16;border:1px solid #26324d;border-radius:6px;padding:1px 6px}
+  esp-web-install-button{--esp-tools-button-color:#04121f;
+      --esp-tools-button-background-color:#3da9fc}
+  .note{color:#8b9ac0;font-size:14px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>🛰️ ESP32-BlueDriver</h1>
+  <p class="sub">One-click web installer — a Bluetooth&nbsp;LE wardriver for the
+     ESP32-S3-DevKitC-1 (N16R8).</p>
+
+  <div class="card">
+    <h3>Install in 30 seconds</h3>
+    <ol>
+      <li>Use <b>Chrome</b> or <b>Edge</b> on a desktop (Web Serial required).</li>
+      <li>Plug the ESP32-S3 into USB.</li>
+      <li>Click <b>Install</b>, pick the serial port, confirm.</li>
+    </ol>
+    <p>
+      <esp-web-install-button manifest="manifest.json">
+        <button slot="activate">Install ESP32-BlueDriver</button>
+        <span slot="unsupported">Your browser doesn't support Web Serial — use Chrome or Edge.</span>
+        <span slot="not-allowed">Open this page over HTTPS to install.</span>
+      </esp-web-install-button>
+    </p>
+    <p class="note">First flash erases the chip and writes the full firmware.</p>
+  </div>
+
+  <div class="card">
+    <h3>After flashing</h3>
+    <ol>
+      <li>The board creates a Wi-Fi network named <code>BlueDriver</code>
+          (password <code>wardrive</code>).</li>
+      <li>Connect your phone/laptop to it.</li>
+      <li>A control panel opens automatically — or browse to
+          <code>http://192.168.4.1/</code>.</li>
+    </ol>
+  </div>
+
+  <p class="note">ESP32-S3 has a Bluetooth LE radio only (no Bluetooth Classic),
+     so this tool wardrives BLE advertisements. For authorized testing and
+     educational use. See the
+     <a href="https://github.com/aingram702/ESP32-BlueDriver">project README</a>.</p>
+</div>
+</body>
+</html>
