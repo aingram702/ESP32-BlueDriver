@@ -1,0 +1,63 @@
+name: build
+
+on:
+  push:
+    branches: ["**"]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write   # needed to publish the web-installer to GitHub Pages
+
+jobs:
+  firmware:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Cache PlatformIO
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.platformio
+            ~/.cache/pip
+          key: pio-${{ runner.os }}-${{ hashFiles('platformio.ini') }}
+
+      - name: Install PlatformIO
+        run: pip install --upgrade platformio
+
+      - name: Build firmware
+        run: pio run -e esp32-s3-devkitc1-n16r8
+
+      - name: Merge into a single flashable binary
+        run: |
+          ENVDIR=.pio/build/esp32-s3-devkitc1-n16r8
+          mkdir -p docs/firmware
+          pip install esptool
+          python -m esptool --chip esp32s3 merge_bin \
+            -o docs/firmware/bluedriver-merged.bin \
+            --flash_mode dio --flash_freq 80m --flash_size 16MB \
+            0x0     $ENVDIR/bootloader.bin \
+            0x8000  $ENVDIR/partitions.bin \
+            0xe000  $HOME/.platformio/packages/framework-arduinoespressif32/tools/partitions/boot_app0.bin \
+            0x10000 $ENVDIR/firmware.bin
+
+      - name: Upload firmware artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: bluedriver-firmware
+          path: docs/firmware/bluedriver-merged.bin
+
+      # Publish the one-click web installer (docs/) to GitHub Pages on main/tags.
+      - name: Deploy web installer to GitHub Pages
+        if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./docs
+          force_orphan: true
