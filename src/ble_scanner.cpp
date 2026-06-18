@@ -71,9 +71,9 @@ void BleScanner::begin() {
   NimBLEDevice::setPower(ESP_PWR_LVL_P9);   // max RX sensitivity / TX power
 
   s_scan = NimBLEDevice::getScan();
-  // wantDuplicates=true (hear every advert so RSSI/counts update);
-  // shouldDelete=false because the callback object is static, not heap.
-  s_scan->setAdvertisedDeviceCallbacks(&s_cb, true, false);
+  // wantDuplicates=true: hear every advertisement so RSSI/counts keep updating.
+  // (s_cb is a static object; NimBLE 1.4.x does not take ownership of it.)
+  s_scan->setAdvertisedDeviceCallbacks(&s_cb, true);
   s_scan->setActiveScan(g_settings.activeScan);
   s_scan->setInterval(BLE_SCAN_INTERVAL);
   s_scan->setWindow(BLE_SCAN_WINDOW);
