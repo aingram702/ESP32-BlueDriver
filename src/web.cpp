@@ -227,10 +227,24 @@ static void handleNotFound() {
 
 // ---------------------------------------------------------------------------
 void WebUi::begin() {
+  WiFi.persistent(false);
   WiFi.mode(WIFI_AP);
+  WiFi.setSleep(false);                 // keep the AP responsive alongside BLE
   WiFi.softAPConfig(apIP, apIP, IPAddress(255, 255, 255, 0));
+
+  // An AP password must be 8+ chars; anything shorter -> open network.
   const char* pass = g_settings.pass.length() >= 8 ? g_settings.pass.c_str() : nullptr;
-  WiFi.softAP(g_settings.ssid.c_str(), pass, AP_CHANNEL);
+
+  bool ok = WiFi.softAP(g_settings.ssid.c_str(), pass, AP_CHANNEL,
+                        /*ssid_hidden=*/0, /*max_connection=*/4);
+  if (!ok) {
+    // Retry once as an open AP in case the password was the problem.
+    Serial.println("softAP failed; retrying as open AP…");
+    ok = WiFi.softAP(g_settings.ssid.c_str(), nullptr, AP_CHANNEL);
+  }
+  Serial.printf("softAP %s  ssid=\"%s\"  ip=%s\n",
+                ok ? "UP" : "FAILED", g_settings.ssid.c_str(),
+                WiFi.softAPIP().toString().c_str());
 
   dns.setErrorReplyCode(DNSReplyCode::NoError);
   dns.start(DNS_PORT, "*", apIP);
