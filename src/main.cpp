@@ -15,6 +15,7 @@
 #include "ble_scanner.h"
 #include "web.h"
 #include "pentest.h"
+#include "uplink.h"
 
 static uint32_t lastSave = 0;
 static size_t   lastSavedCount = 0;
@@ -44,6 +45,7 @@ void setup() {
   // Bring Wi-Fi / the web UI up FIRST so the AP is beaconing before the BLE
   // controller starts competing for the shared 2.4 GHz radio.
   g_web.begin();
+  g_uplink.begin();           // optional STA uplink (keeps our AP up too)
   g_pentest.begin();
   g_scanner.begin();
 
@@ -60,6 +62,7 @@ void loop() {
   g_web.tick();
   g_gps.update();
   g_scanner.tick();
+  g_uplink.tick();
 
   // Periodic autosave to flash so a power blip doesn't lose the session log.
   uint32_t nowMs = millis();

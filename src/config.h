@@ -22,6 +22,23 @@
 #define DNS_PORT            53
 
 // ---------------------------------------------------------------------------
+//  Data uplink (optional) — push discovered BLE devices to another board
+// ---------------------------------------------------------------------------
+//  When enabled, BlueDriver also joins another Wi-Fi network (e.g. your
+//  ESP32-Wardriver's access point) as a station and periodically HTTP-POSTs
+//  newly discovered / updated devices as JSON.  It keeps its own AP + web UI
+//  running at the same time (AP+STA mode).  All fields are editable at runtime
+//  from the web UI's Settings tab.
+#define UPLINK_ENABLED_DEFAULT   false
+#define UPLINK_SSID_DEFAULT      "Wardriver"   // the receiving board's AP SSID
+#define UPLINK_PASS_DEFAULT      ""            // its AP password ("" = open)
+#define UPLINK_HOST_DEFAULT      "192.168.4.1" // receiving board's IP on its AP
+#define UPLINK_PORT_DEFAULT      80
+#define UPLINK_PATH_DEFAULT      "/ingest"     // HTTP endpoint that accepts JSON
+#define UPLINK_INTERVAL_DEFAULT  15            // seconds between POST batches
+#define UPLINK_BATCH_MAX         40            // devices per POST
+
+// ---------------------------------------------------------------------------
 //  Onboard status LED (RGB on the DevKitC-1)
 // ---------------------------------------------------------------------------
 #define STATUS_LED_PIN      48      // WS2812 "RGB" LED on ESP32-S3-DevKitC-1

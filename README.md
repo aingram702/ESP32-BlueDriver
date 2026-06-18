@@ -167,6 +167,21 @@ docs/                 One-click web installer (GitHub Pages)
 
 ---
 
+## 🔗 Data uplink to another board
+
+BlueDriver can offload its finds to a second board (e.g. your **ESP32-Wardriver**)
+so everything is logged in one place. With **Settings → Data Uplink** enabled,
+BlueDriver runs in **AP+STA mode**: it keeps its own AP + web UI *and* joins the
+receiving board's Wi-Fi, HTTP-POSTing a JSON batch of new/updated devices every
+*N* seconds. Devices are only marked "sent" on a `2xx`, so nothing is lost or
+duplicated if the link drops.
+
+Because the receiver's AP channel is fixed, the station link is stable even while
+BLE scanning runs — unlike channel-hopping wireless schemes.
+
+See **[docs/wardriver-ingest.md](docs/wardriver-ingest.md)** for the JSON format
+and a drop-in `POST /ingest` receiver you can paste into the Wardriver firmware.
+
 ## ⚖️ Legal & ethical use
 
 This project is for **authorized security testing, research, and education**.
