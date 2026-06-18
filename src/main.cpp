@@ -41,14 +41,18 @@ void setup() {
   g_store.begin();
   g_gps.begin();
 
-  g_scanner.begin();
-  g_pentest.begin();
+  // Bring Wi-Fi / the web UI up FIRST so the AP is beaconing before the BLE
+  // controller starts competing for the shared 2.4 GHz radio.
   g_web.begin();
+  g_pentest.begin();
+  g_scanner.begin();
 
-  g_scanner.start();          // start wardriving immediately on boot
+  g_scanner.start();          // start wardriving once the AP is up
 
-  Serial.printf("AP \"%s\"  ->  http://192.168.4.1/\n", g_settings.ssid.c_str());
-  Serial.printf("Free PSRAM: %u bytes\n", ESP.getFreePsram());
+  Serial.printf("Ready. Connect to AP \"%s\"  ->  http://192.168.4.1/\n",
+                g_settings.ssid.c_str());
+  Serial.printf("Free heap: %u  Free PSRAM: %u bytes\n",
+                ESP.getFreeHeap(), ESP.getFreePsram());
   setLed(0, 8, 0);
 }
 

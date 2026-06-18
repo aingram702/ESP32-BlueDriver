@@ -42,8 +42,11 @@
 //  BLE scanner
 // ---------------------------------------------------------------------------
 #define BLE_ACTIVE_SCAN     true    // request scan-response (names) — more data
-#define BLE_SCAN_INTERVAL   97      // ms
-#define BLE_SCAN_WINDOW     97      // ms (== interval => continuous listening)
+// IMPORTANT: Wi-Fi (the web UI) and BLE share one 2.4 GHz radio. The scan window
+// MUST stay well below the interval, otherwise continuous scanning starves the
+// Wi-Fi AP of airtime and the "BlueDriver" SSID never beacons / never appears.
+#define BLE_SCAN_INTERVAL   160     // ms between the start of each scan window
+#define BLE_SCAN_WINDOW     80      // ms actively listening (50% duty -> WiFi ok)
 #define BLE_SCAN_DURATION   0       // 0 = scan forever (restarted automatically)
 
 // ---------------------------------------------------------------------------
