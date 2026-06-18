@@ -16,6 +16,7 @@
 #include "gps.h"
 #include "settings.h"
 #include "pentest.h"
+#include "uplink.h"
 
 WebUi g_web;
 
@@ -139,6 +140,14 @@ static void handleStatus() {
   JsonObject bj = doc["beacon"].to<JsonObject>();
   bj["active"] = g_pentest.beaconActive();
   bj["info"]   = g_pentest.beaconInfo();
+  const UplinkStatus& u = g_uplink.status();
+  JsonObject uj = doc["uplink"].to<JsonObject>();
+  uj["enabled"]   = u.enabled;
+  uj["connected"] = u.connected;
+  uj["sent"]      = u.sent;
+  uj["batches"]   = u.batches;
+  uj["lastCode"]  = u.lastCode;
+  uj["pending"]   = u.pending;
   String out; serializeJson(doc, out);
   server.send(200, "application/json", out);
 }
@@ -179,6 +188,13 @@ static void handleConfigGet() {
   doc["ssid"]   = g_settings.ssid;
   doc["pass"]   = g_settings.pass;
   doc["active"] = g_settings.activeScan;
+  doc["ulEn"]   = g_settings.uplinkEnabled;
+  doc["ulSsid"] = g_settings.uplinkSsid;
+  doc["ulPass"] = g_settings.uplinkPass;
+  doc["ulHost"] = g_settings.uplinkHost;
+  doc["ulPort"] = g_settings.uplinkPort;
+  doc["ulPath"] = g_settings.uplinkPath;
+  doc["ulInt"]  = g_settings.uplinkInterval;
   String out; serializeJson(doc, out);
   server.send(200, "application/json", out);
 }
@@ -187,6 +203,13 @@ static void handleConfigPost() {
   if (server.hasArg("ssid"))   g_settings.ssid = server.arg("ssid");
   if (server.hasArg("pass"))   g_settings.pass = server.arg("pass");
   if (server.hasArg("active")) g_settings.activeScan = (server.arg("active") == "1");
+  if (server.hasArg("ulEn"))   g_settings.uplinkEnabled = (server.arg("ulEn") == "1");
+  if (server.hasArg("ulSsid")) g_settings.uplinkSsid = server.arg("ulSsid");
+  if (server.hasArg("ulPass")) g_settings.uplinkPass = server.arg("ulPass");
+  if (server.hasArg("ulHost")) g_settings.uplinkHost = server.arg("ulHost");
+  if (server.hasArg("ulPort")) g_settings.uplinkPort = server.arg("ulPort").toInt();
+  if (server.hasArg("ulPath")) g_settings.uplinkPath = server.arg("ulPath");
+  if (server.hasArg("ulInt"))  g_settings.uplinkInterval = server.arg("ulInt").toInt();
   g_settings.save();
   server.send(200, "application/json", "{\"ok\":1,\"reboot\":1}");
   delay(300);

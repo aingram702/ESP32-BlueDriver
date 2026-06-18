@@ -74,6 +74,7 @@ small{color:var(--mut)}
     <span class="chip">New this run <b id="s-new">0</b></span>
     <span class="chip">Scan <b id="s-scan">--</b></span>
     <span class="chip">GPS <b id="s-gps">--</b></span>
+    <span class="chip">Uplink <b id="s-ul">off</b></span>
     <span class="chip">Uptime <b id="s-up">0s</b></span>
     <span class="chip">Heap <b id="s-heap">0</b>k</span>
     <span class="chip">PSRAM <b id="s-ps">0</b>k</span>
@@ -160,11 +161,30 @@ small{color:var(--mut)}
       <div><label>Password (blank = open, else 8+ chars)</label><input id="cPass"></div>
     </div>
     <label style="margin-top:10px"><input type="checkbox" id="cActive"> Active scan (request names — more data, slightly noisier)</label>
-    <div class="bar" style="margin-top:12px">
-      <button id="btnSaveCfg" class="btn">Save &amp; reboot</button>
-      <span class="muted">AP changes apply after reboot.</span>
-    </div>
   </div>
+
+  <div class="card">
+    <h3>Data Uplink</h3>
+    <p class="muted">Also push discovered devices to another board (e.g. your
+      ESP32-Wardriver) over Wi-Fi. BlueDriver keeps its own AP + this UI running
+      and POSTs a JSON batch of new/updated devices to the target periodically.</p>
+    <label><input type="checkbox" id="ulEn"> Enable uplink</label>
+    <div class="grid" style="margin-top:8px">
+      <div><label>Target AP SSID</label><input id="ulSsid"></div>
+      <div><label>Target AP password</label><input id="ulPass"></div>
+      <div><label>Host / IP</label><input id="ulHost" placeholder="192.168.4.1"></div>
+      <div><label>Port</label><input id="ulPort" type="number" placeholder="80"></div>
+      <div><label>POST path</label><input id="ulPath" placeholder="/ingest"></div>
+      <div><label>Interval (seconds)</label><input id="ulInt" type="number" placeholder="15"></div>
+    </div>
+    <p class="muted" style="margin-top:8px">Status: <span id="ulStatus">—</span></p>
+  </div>
+
+  <div class="bar" style="margin-top:4px;margin-bottom:14px">
+    <button id="btnSaveCfg" class="btn">Save &amp; reboot</button>
+    <span class="muted">Settings apply after reboot.</span>
+  </div>
+
   <div class="card">
     <h3>About</h3>
     <div class="kv" id="about"></div>
@@ -211,6 +231,13 @@ async function poll(){
     $('#beaconState').textContent=s.beacon.active?('Broadcasting: '+s.beacon.info):'idle';
     $('#about').innerHTML=`<div>Firmware</div><div>${s.fw} v${s.ver}</div>
       <div>Free heap</div><div>${s.heap} B</div><div>Free PSRAM</div><div>${s.psram} B</div>`;
+    const u=s.uplink||{};
+    $('#s-ul').textContent=u.enabled?(u.connected?'linked':'…'):'off';
+    if($('#ulStatus')){
+      $('#ulStatus').textContent=!u.enabled?'disabled':
+        (u.connected?`linked · sent ${u.sent} · pending ${u.pending} · HTTP ${u.lastCode}`
+                    :`connecting to AP… (sent ${u.sent})`);
+    }
   }catch(e){}
 }
 
@@ -289,9 +316,16 @@ $('#btnBeaconStop').onclick=async()=>{await fetch('/api/pentest/beacon?action=st
 async function loadCfg(){
   const c=await (await fetch('/api/config')).json();
   $('#cSsid').value=c.ssid;$('#cPass').value=c.pass;$('#cActive').checked=c.active;
+  $('#ulEn').checked=c.ulEn;$('#ulSsid').value=c.ulSsid;$('#ulPass').value=c.ulPass;
+  $('#ulHost').value=c.ulHost;$('#ulPort').value=c.ulPort;$('#ulPath').value=c.ulPath;
+  $('#ulInt').value=c.ulInt;
 }
 $('#btnSaveCfg').onclick=async()=>{
-  const p=new URLSearchParams({ssid:$('#cSsid').value,pass:$('#cPass').value,active:$('#cActive').checked?1:0});
+  const p=new URLSearchParams({ssid:$('#cSsid').value,pass:$('#cPass').value,
+    active:$('#cActive').checked?1:0,
+    ulEn:$('#ulEn').checked?1:0,ulSsid:$('#ulSsid').value,ulPass:$('#ulPass').value,
+    ulHost:$('#ulHost').value,ulPort:$('#ulPort').value||80,ulPath:$('#ulPath').value||'/ingest',
+    ulInt:$('#ulInt').value||15});
   await fetch('/api/config?'+p,{method:'POST'});
   alert('Saved. Rebooting…');
 };
