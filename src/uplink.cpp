@@ -132,15 +132,17 @@ void Uplink::sendCycle() {
       Serial.printf("Link: cmd #%u '%s'\n", id, cmd.c_str());
 
       if (cmd == "scan") {
-        if (c["on"].is<int>())  (c["on"].as<int>() ? g_scanner.start() : g_scanner.stop());
-        else                    (g_scanner.scanning() ? g_scanner.stop() : g_scanner.start());
+        int on = c["on"] | -1;   // accepts 0/1 or true/false; -1 = absent
+        if (on >= 0) (on ? g_scanner.start() : g_scanner.stop());
+        else         (g_scanner.scanning() ? g_scanner.stop() : g_scanner.start());
 
       } else if (cmd == "clear") {
         g_store.clear();
 
       } else if (cmd == "config") {
-        if (c["activeScan"].is<int>()) {
-          g_settings.activeScan = (c["activeScan"].as<int>() != 0);
+        int as = c["activeScan"] | -1;
+        if (as >= 0) {
+          g_settings.activeScan = (as != 0);
           g_settings.save();
           g_scanner.setActiveScan(g_settings.activeScan);
         }

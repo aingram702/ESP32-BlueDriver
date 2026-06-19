@@ -1,103 +1,115 @@
 # 🛰️ ESP32-BlueDriver
 
-A **Bluetooth LE wardriver** for the **ESP32-S3-DevKitC-1 (N16R8)**.
+A **headless Bluetooth LE wardriving sensor** for the **ESP32-S3-DevKitC-1
+(N16R8)** that feeds your **[ESP32-WarDriver](https://github.com/aingram702/ESP32-Wardriver)**.
 
-It continuously scans for Bluetooth Low Energy advertisements, keeps a clean,
-**de-duplicated** list of every unique device it has ever heard, optionally
-geotags them with GPS, and gives you a **captive-portal web interface** that
-controls everything from your phone. It also bundles a small **BLE pentest
-toolkit** for authorized testing.
+It continuously scans for Bluetooth Low Energy advertisements, keeps a
+**de-duplicated** list of every unique device it hears (in 8 MB PSRAM), optionally
+geotags them with GPS, and **streams them to the WarDriver over Wi-Fi**. The
+WarDriver's web UI is the single control surface for both boards — it can start/
+stop scanning, clear the list, toggle active scan, and drive the built-in **BLE
+pentest tools** remotely. It also bundles those pentest tools for authorized use.
 
-> **Why "BLE" and not "Bluetooth"?**
-> The ESP32-S3's radio supports **Bluetooth LE 5.0 only — it has *no* Bluetooth
-> Classic (BR/EDR)**. So this firmware wardrives BLE, which is what virtually
-> all modern trackers, wearables, beacons, headphones, phones (while
-> advertising), TVs, and IoT gear use. If you need Bluetooth Classic discovery
-> you'd need an original ESP32 (not S3); the wardriving UX here is built for BLE.
+> **v2.0.0 — headless sensor.** Earlier versions hosted their own Wi-Fi AP + web
+> UI on the BlueDriver board. As of v2.0.0 the BlueDriver has **no UI of its
+> own**: it joins the WarDriver's access point as a Wi-Fi station and is
+> controlled entirely from the WarDriver. This removes the Wi-Fi-AP/BLE radio
+> contention and puts all your data in one place. (Need the standalone web-UI
+> build? Check out a pre-v2.0.0 tag.)
+
+> **Why "BLE" and not "Bluetooth"?** The ESP32-S3 radio supports **Bluetooth LE
+> 5.0 only — no Bluetooth Classic (BR/EDR)**. That covers virtually all modern
+> trackers, wearables, beacons, headphones, advertising phones, TVs and IoT gear.
+> Bluetooth Classic discovery would require an original ESP32 (not S3).
 
 ---
 
 ## ✨ Features
 
-- **Continuous BLE wardriving** — active scan captures names, RSSI, TX power,
-  manufacturer (resolved to vendor names), service UUIDs, appearance and
+- **Continuous BLE wardriving** — captures name, RSSI (last + best), TX power,
+  manufacturer (resolved to vendor names), service UUID, appearance and
   connectability.
-- **No duplicates** — devices are keyed by MAC address. A device seen 5,000
-  times is **one** row; its hit-count, signal range, last-seen time and best-fix
-  GPS coordinate update in place. The big device table lives in **PSRAM** (8 MB),
-  so it scales to tens of thousands of unique devices.
-- **Super-easy install** — flash straight from your browser with one click (no
-  toolchain). See below.
-- **Intuitive web UI** — a self-hosted, offline single-page control panel:
-  live sortable/searchable device list, start/stop, clear, device detail view,
-  and one-click exports. Auto-refreshes.
+- **No duplicates** — devices are keyed by MAC. A device heard 5,000 times is
+  **one** record; its hit-count, signal range, last-seen and best-fix GPS update
+  in place. The store lives in **PSRAM**, scaling to tens of thousands of uniques
+  (with a low-memory guard so it degrades gracefully instead of crashing).
+- **Streams to the WarDriver** — every ~4 s it POSTs newly discovered devices to
+  the WarDriver's `/ingest` endpoint; each unique device is sent **once**, and
+  only marked sent on an HTTP `2xx`, so nothing is lost or duplicated if the link
+  drops. The same response channel delivers remote-control commands.
 - **GPS geotagging (optional)** — plug in any NMEA serial GPS (NEO-6M/M8N…) and
-  every device is tagged with the coordinate of its strongest reception.
-- **WiGLE-ready export** — download a `WigleWifi-1.6` CSV (Type = `BLE`) you can
-  upload directly to [wigle.net](https://wigle.net), plus a raw JSON export.
-- **BLE pentest toolkit** (authorized use):
+  each device is tagged with the coordinate of its strongest reception.
+- **WiGLE-ready logging** — keeps a local `WigleWifi-1.6` CSV (Type = `BLE`)
+  backup on flash, and the WarDriver-side receiver writes the same format to SD.
+- **BLE pentest toolkit** (authorized use), driven remotely from the WarDriver:
   - **GATT enumeration** — connect to a target and map its services,
-    characteristics, properties, and readable values.
-  - **Beacon transmitter** — broadcast iBeacon / Eddystone-URL / custom frames
-    to test how nearby apps and scanners react.
-  - **Name spoof advertiser** — re-advertise a device name to validate
-    proximity/asset systems you control.
+    characteristics, properties and readable values.
+  - **Beacon transmitter** — broadcast iBeacon / Eddystone-URL / custom frames.
 
 ---
 
-## 🚀 Installation
+## 🚀 Install
 
-### Option A — One-click web installer (easiest)
+### 1. Set the link parameters (required)
 
-1. Open the installer page in **Chrome** or **Edge** on a desktop:
-   **`https://aingram702.github.io/ESP32-BlueDriver/`**
-   *(published automatically by CI once this repo is pushed to `main`/tagged).*
-2. Plug the ESP32-S3 into USB.
-3. Click **Install**, choose the serial port, confirm. Done.
+Edit [`src/config.h`](src/config.h) so they match your WarDriver's access point:
 
-### Option B — PlatformIO
+```c
+#define LINK_SSID   "Wardriver"      // == WarDriver AP SSID
+#define LINK_PASS   "wardrive-me"    // == WarDriver AP password ("" = open)
+#define LINK_HOST   "192.168.4.1"    // WarDriver SoftAP gateway IP
+#define LINK_PORT   80
+#define LINK_PATH   "/ingest"
+```
+
+> ⚠️ **Change `LINK_PASS`.** The default is published here, so anyone could
+> impersonate the WarDriver AP. Use a strong WPA2 password that matches your
+> WarDriver's AP. See [Security](#-security).
+
+### 2. Flash it
 
 ```bash
-# Requires PlatformIO (pip install platformio)
+# PlatformIO (pip install platformio)
 git clone https://github.com/aingram702/ESP32-BlueDriver.git
 cd ESP32-BlueDriver
 pio run -t upload          # build + flash
-pio device monitor         # optional serial log
+pio device monitor         # serial log (USB CDC, 115200)
 ```
 
-### Option C — Pre-merged binary with esptool
-
-Download `bluedriver-merged.bin` from the latest CI run / release, then:
+Or flash the pre-merged CI binary with esptool:
 
 ```bash
 esptool.py --chip esp32s3 write_flash 0x0 bluedriver-merged.bin
 ```
 
----
+### 3. Add the receiver to the WarDriver
 
-## 📱 First run
-
-1. After flashing, the board starts a Wi-Fi access point:
-   - **SSID:** `BlueDriver`
-   - **Password:** `wardrive`
-2. Connect your phone or laptop. A **captive portal** opens the control panel
-   automatically (or browse to **`http://192.168.4.1/`**).
-3. Scanning starts on boot — devices begin populating immediately.
-
-The onboard RGB LED pulses **green** while scanning, **red** when idle.
+Implement the `POST /ingest` endpoint on the WarDriver — there's a drop-in
+handler in **[docs/wardriver-ingest.md](docs/wardriver-ingest.md)**.
 
 ---
 
-## 🖥️ Web interface
+## 📡 How it connects
 
-| Tab | What it does |
-|-----|--------------|
-| **Devices** | Live, de-duplicated table. Search by name/MAC/vendor, sort by signal/hits/recency/name, tap a row for full detail (and a GATT-enumerate button). Start/Stop scan, Clear, Export CSV/JSON. |
-| **Pentest Tools** | GATT enumeration of a target; Beacon transmitter (iBeacon / Eddystone / custom). |
-| **Settings** | Change AP SSID/password, toggle active scan, view device info. |
+1. On boot, BlueDriver joins the WarDriver's Wi-Fi (`LINK_SSID`) as a station and
+   starts BLE scanning immediately.
+2. Every `LINK_INTERVAL_MS` (default 4 s) it makes **one HTTP POST** to
+   `http://LINK_HOST:LINK_PORT/LINK_PATH` containing its status, GPS, any
+   finished GATT result, and a batch of new devices.
+3. The WarDriver's **response** carries back control commands (scan on/off,
+   clear, active-scan, beacon, gatt) which BlueDriver executes.
 
-Everything is served from flash and works fully **offline** on the AP — no
-internet or CDN needed.
+Serial log on boot prints the link target and, once associated, the upload
+status. The onboard RGB LED shows state at a glance:
+
+| LED | meaning |
+|-----|---------|
+| green pulse | scanning **and** linked to the WarDriver |
+| amber/red pulse | scanning but **not** linked (joining/retrying) |
+| dim red / blue tint | idle (blue tint = linked) |
+
+The full request/response schema and command reference are in
+**[docs/wardriver-ingest.md](docs/wardriver-ingest.md)**.
 
 ---
 
@@ -111,38 +123,21 @@ internet or CDN needed.
 | GND     | GND |
 
 Defaults are in [`src/config.h`](src/config.h) (`GPS_RX_PIN`, `GPS_BAUD`, …).
-No GPS? It just runs without coordinates — the UI shows `GPS: none`.
+No GPS? It just runs without coordinates.
 
 ---
 
-## ⚙️ Configuration
+## ⚙️ Configuration & hardware
 
-Compile-time defaults live in [`src/config.h`](src/config.h): AP credentials,
-GPS pins, scan timing, device cap, autosave interval. SSID/password and the
-active-scan toggle are also editable at runtime from the **Settings** tab
-(persisted to flash).
+Compile-time configuration is in [`src/config.h`](src/config.h): the WarDriver
+link parameters, GPS pins, BLE scan timing (window kept at 50% duty so the Wi-Fi
+station stays responsive), device cap, and autosave interval. The only runtime
+setting is the active-scan toggle (set remotely by the WarDriver, persisted to
+flash).
 
 **Hardware target:** `board = esp32-s3-devkitc-1`, 16 MB flash, 8 MB **octal**
-PSRAM (`qio_opi`), custom [`partitions.csv`](partitions.csv) with dual OTA app
-slots and a large LittleFS log area.
-
----
-
-## 🔌 REST API
-
-The UI is a thin client over a small HTTP API you can script against:
-
-| Method | Endpoint | Purpose |
-|--------|----------|---------|
-| GET  | `/api/status` | live counters, GPS, beacon state |
-| GET  | `/api/devices?limit=&q=&sort=` | de-duplicated device list (JSON) |
-| POST | `/api/scan?toggle=1` (or `on=1/0`) | start/stop scanning |
-| POST | `/api/clear` | wipe the device list |
-| GET  | `/export.csv` | WiGLE CSV download |
-| GET  | `/export.json` | full JSON download |
-| GET/POST | `/api/config` | read/update settings |
-| POST | `/api/pentest/gatt?mac=&type=` | enumerate a target's GATT |
-| POST | `/api/pentest/beacon?action=start&type=&...` | beacon transmitter |
+PSRAM (`qio_opi`), custom [`partitions.csv`](partitions.csv) (dual OTA app slots
++ LittleFS log area).
 
 ---
 
@@ -152,49 +147,46 @@ The UI is a thin client over a small HTTP API you can script against:
 platformio.ini        Build config (board, PSRAM, partitions, libs)
 partitions.csv        16 MB partition table (2× OTA + LittleFS log)
 src/
-  main.cpp            Boot + main loop (scan, web, GPS, autosave, LED)
-  config.h            Compile-time configuration
-  settings.{h,cpp}    Runtime settings persisted to flash
+  main.cpp            Boot + main loop (scan, GPS, uplink, autosave, LED)
+  config.h            Compile-time configuration (incl. WarDriver link)
+  settings.{h,cpp}    Active-scan toggle persisted to flash
   ble_scanner.{h,cpp} Continuous NimBLE observer
-  device_store.{h,cpp}De-duplicated PSRAM device store + CSV export
+  device_store.{h,cpp}De-dup PSRAM device store + uplink batching + CSV
   gps.{h,cpp}         Optional NMEA GPS (TinyGPS++)
-  web.{h,cpp}         Captive-portal WebServer + REST API
-  web_index.h         Embedded single-page UI (HTML/CSS/JS)
+  uplink.{h,cpp}      Wi-Fi station link: POST devices + run commands
   pentest.{h,cpp}     GATT enumeration + beacon transmitter
-docs/                 One-click web installer (GitHub Pages)
-.github/workflows/    CI: build, merge bin, publish installer
+docs/wardriver-ingest.md  Link protocol + drop-in WarDriver receiver
+.github/workflows/    CI: build + merge binary
 ```
 
 ---
 
-## 🔗 Data uplink to another board
+## 🔒 Security
 
-BlueDriver can offload its finds to a second board (e.g. your **ESP32-Wardriver**)
-so everything is logged in one place. With **Settings → Data Uplink** enabled,
-BlueDriver runs in **AP+STA mode**: it keeps its own AP + web UI *and* joins the
-receiving board's Wi-Fi, HTTP-POSTing a JSON batch of new/updated devices every
-*N* seconds. Devices are only marked "sent" on a `2xx`, so nothing is lost or
-duplicated if the link drops.
+- **Use WPA2 on the WarDriver AP and change `LINK_PASS`.** BlueDriver executes
+  control commands returned by whatever answers at `LINK_HOST`. A strong, unique
+  AP password is what prevents an attacker from impersonating the WarDriver and
+  issuing commands (clear, beacon, GATT). The link is plain HTTP — fine on a
+  private AP, but the AP password is the trust boundary.
+- **Advertised names are attacker-controllable.** BlueDriver sanitizes them for
+  CSV (strips `, " CR LF`) and JSON-escapes them for the uplink; the WarDriver
+  should likewise escape them when rendering its UI.
+- **Memory-exhaustion resistant.** The device store is capped and refuses new
+  entries when PSRAM runs low, so a flood of random-MAC advertisements degrades
+  gracefully instead of crashing.
+- **Pentest tools are dual-use.** GATT enumeration and the beacon/spoof
+  transmitter must only target devices you own or are authorized to test. There
+  is deliberately **no** indiscriminate "BLE spam / pairing-popup flood" DoS tool.
 
-Because the receiver's AP channel is fixed, the station link is stable even while
-BLE scanning runs — unlike channel-hopping wireless schemes.
-
-See **[docs/wardriver-ingest.md](docs/wardriver-ingest.md)** for the JSON format
-and a drop-in `POST /ingest` receiver you can paste into the Wardriver firmware.
+---
 
 ## ⚖️ Legal & ethical use
 
 This project is for **authorized security testing, research, and education**.
-
-- **Passive BLE scanning/wardriving is legal** in most jurisdictions (it only
-  receives publicly broadcast advertisements) but **laws vary** — know yours.
-- The **pentest tools** (GATT enumeration, beacon/spoof transmitters) must only
-  be used against devices **you own or have explicit written permission** to
-  test, or in CTF/lab environments.
-- There is deliberately **no indiscriminate "BLE spam / pairing-popup flood"
-  DoS tool** here, as that only disrupts uninvolved bystanders.
-
-You are responsible for complying with all applicable laws and regulations.
+Passive BLE scanning only receives publicly broadcast advertisements and is legal
+in most jurisdictions, but **laws vary — know yours**. The pentest tools must only
+be used against devices you own or have explicit written permission to test (or in
+CTF/lab environments). You are responsible for complying with all applicable laws.
 
 ## 📄 License
 
