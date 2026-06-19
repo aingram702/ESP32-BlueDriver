@@ -46,12 +46,14 @@
 
   <div class="card">
     <h3>After flashing</h3>
+    <p class="note">v2.0.0 is a <b>headless sensor</b> — it has no Wi-Fi AP or
+       web UI of its own. Before flashing, set the WarDriver link parameters in
+       <code>src/config.h</code> (<code>LINK_SSID</code> / <code>LINK_PASS</code>).</p>
     <ol>
-      <li>The board creates a Wi-Fi network named <code>BlueDriver</code>
-          (password <code>wardrive</code>).</li>
-      <li>Connect your phone/laptop to it.</li>
-      <li>A control panel opens automatically — or browse to
-          <code>http://192.168.4.1/</code>.</li>
+      <li>BlueDriver joins your <b>ESP32-WarDriver</b>'s Wi-Fi and starts scanning.</li>
+      <li>It POSTs discovered BLE devices to the WarDriver, which controls it.</li>
+      <li>Add the <code>POST /ingest</code> receiver to the WarDriver — see
+          <a href="https://github.com/aingram702/ESP32-BlueDriver/blob/main/docs/wardriver-ingest.md">the link protocol doc</a>.</li>
     </ol>
   </div>
 

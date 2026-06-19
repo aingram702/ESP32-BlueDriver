@@ -69,6 +69,77 @@ void DeviceStore::clear() {
   unlock();
 }
 
+// ---------------------------------------------------------------------------
+//  Uplink batching (JSON for the WarDriver's /ingest endpoint)
+// ---------------------------------------------------------------------------
+static String jsonEscape(const char* s) {
+  String out;
+  for (; *s; ++s) {
+    char c = *s;
+    if (c == '"' || c == '\\') { out += '\\'; out += c; }
+    else if (c == '\n')        { out += "\\n"; }
+    else if ((uint8_t)c >= 0x20) out += c;       // drop other control chars
+  }
+  return out;
+}
+
+static void appendDeviceJson(String& out, const BleDevice& d) {
+  char mac[18];
+  macToStr(d.mac, mac);
+  out += "{\"mac\":\""; out += mac; out += "\"";
+  out += ",\"name\":\""; out += jsonEscape(d.name); out += "\"";
+  out += ",\"vendor\":\""; out += jsonEscape(d.manufacturer); out += "\"";
+  out += ",\"svc\":\""; out += jsonEscape(d.serviceUuid); out += "\"";
+  out += ",\"rssi\":" + String(d.rssiLast);
+  out += ",\"rssiBest\":" + String(d.rssiBest);
+  out += ",\"count\":" + String(d.count);
+  out += ",\"addrType\":" + String(d.addrType);
+  out += ",\"conn\":" + String(d.connectable ? 1 : 0);
+  out += ",\"first\":" + String(d.firstSeen);
+  out += ",\"last\":" + String(d.lastSeen);
+  out += ",\"gps\":" + String(d.hasGps ? 1 : 0);
+  out += ",\"lat\":" + String(d.lat, 6);
+  out += ",\"lon\":" + String(d.lon, 6);
+  out += ",\"alt\":" + String(d.alt, 1);
+  out += "}";
+}
+
+size_t DeviceStore::buildUplinkBatch(String& outDevicesJson,
+                                     std::vector<uint64_t>& outKeys,
+                                     size_t maxItems) {
+  size_t n = 0;
+  outDevicesJson = "[";
+  lock();
+  for (auto& kv : devices_) {
+    if (kv.second.uplinked) continue;          // send each unique device once
+    if (n) outDevicesJson += ",";
+    appendDeviceJson(outDevicesJson, kv.second);
+    outKeys.push_back(kv.first);
+    if (++n >= maxItems) break;
+  }
+  unlock();
+  outDevicesJson += "]";
+  return n;
+}
+
+void DeviceStore::markUplinked(const std::vector<uint64_t>& keys) {
+  lock();
+  for (uint64_t k : keys) {
+    auto it = devices_.find(k);
+    if (it != devices_.end()) it->second.uplinked = true;
+  }
+  unlock();
+}
+
+size_t DeviceStore::pendingUplink() {
+  size_t n = 0;
+  lock();
+  for (auto& kv : devices_)
+    if (!kv.second.uplinked) n++;
+  unlock();
+  return n;
+}
+
 bool DeviceStore::observe(const AdvObservation& obs, uint32_t now,
                           bool gpsValid, double lat, double lon, float alt) {
   uint64_t key = macToKey(obs.mac);
@@ -77,7 +148,12 @@ bool DeviceStore::observe(const AdvObservation& obs, uint32_t now,
   lock();
   auto it = devices_.find(key);
   if (it == devices_.end()) {
-    if (devices_.size() >= MAX_DEVICES) { unlock(); return false; }
+    // Refuse new entries past the cap or when memory runs low, so we degrade
+    // gracefully (keep what we have) instead of aborting on a failed alloc.
+    if (devices_.size() >= MAX_DEVICES || ESP.getFreePsram() < 48 * 1024) {
+      unlock();
+      return false;
+    }
     BleDevice d{};
     d.key = key;
     memcpy(d.mac, obs.mac, 6);
@@ -122,6 +198,18 @@ bool DeviceStore::observe(const AdvObservation& obs, uint32_t now,
 //  CSV persistence.  We use WiGLE's "WigleWifi-1.6" layout so the exported
 //  file can be uploaded straight to wigle.net, with Type=BLE.
 // ---------------------------------------------------------------------------
+// Make a value safe for a CSV cell: strip commas / CR / LF that would otherwise
+// shift columns or break rows (advertised names are attacker-controllable).
+static String csvSafe(const char* s) {
+  String out;
+  for (; *s; ++s) {
+    char c = *s;
+    if (c == ',' || c == '\r' || c == '\n' || c == '"') out += ' ';
+    else if ((uint8_t)c >= 0x20) out += c;
+  }
+  return out;
+}
+
 static void writeWigleHeader(File& f) {
   f.printf(
       "WigleWifi-1.6,appRelease=%s,model=ESP32-S3,release=%s,"
@@ -146,8 +234,8 @@ bool DeviceStore::saveCsv(const char* path) {
     // AuthMode carries the human-meaningful descriptor for BLE rows.
     f.printf("%s,%s,%s,%lu,0,%d,%.6f,%.6f,%.1f,0,BLE\n",
              mac,
-             d.name[0] ? d.name : "",
-             d.manufacturer[0] ? d.manufacturer : "BLE Device",
+             d.name[0] ? csvSafe(d.name).c_str() : "",
+             d.manufacturer[0] ? csvSafe(d.manufacturer).c_str() : "BLE Device",
              (unsigned long)firstEpoch,
              d.rssiLast,
              d.hasGps ? d.lat : 0.0,

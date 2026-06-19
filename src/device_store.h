@@ -8,6 +8,7 @@
 #pragma once
 #include <Arduino.h>
 #include <unordered_map>
+#include <vector>
 #include "config.h"
 
 // --- PSRAM allocator so the (potentially large) device map lives in PSRAM ----
@@ -51,6 +52,7 @@ struct BleDevice {
   double   lon;
   float    alt;
   bool     hasGps;
+  bool     uplinked;                  // already uploaded to the WarDriver
 };
 
 using DeviceMap =
@@ -94,6 +96,17 @@ class DeviceStore {
   // Persistence (LittleFS)
   bool saveCsv(const char* path);
   bool loadCsv(const char* path);
+
+  // --- Uplink to the WarDriver ---
+  // Append up to maxItems not-yet-uploaded devices as a JSON array (the whole
+  // build happens under lock) and record their keys in outKeys so they can be
+  // marked once the POST is confirmed. Returns the number included.
+  size_t buildUplinkBatch(String& outDevicesJson,
+                          std::vector<uint64_t>& outKeys, size_t maxItems);
+  // Mark the given devices as uploaded (call only after a 2xx response).
+  void   markUplinked(const std::vector<uint64_t>& keys);
+  // How many unique devices still need to be uploaded.
+  size_t pendingUplink();
 
  private:
   DeviceMap devices_;
