@@ -72,7 +72,6 @@ void BleScanner::begin() {
 
   s_scan = NimBLEDevice::getScan();
   // wantDuplicates=true: hear every advertisement so RSSI/counts keep updating.
-  // (s_cb is a static object; NimBLE 1.4.x does not take ownership of it.)
   s_scan->setAdvertisedDeviceCallbacks(&s_cb, true);
   s_scan->setActiveScan(g_settings.activeScan);
   s_scan->setInterval(BLE_SCAN_INTERVAL);
@@ -96,6 +95,17 @@ void BleScanner::tick() {
   // NimBLE stops scanning while a central connection (GATT enumeration) is
   // active and after each duration window; restart it if we should be running.
   if (scanning_ && s_scan && !s_scan->isScanning()) {
+    s_scan->start(BLE_SCAN_DURATION, nullptr, false);
+  }
+}
+
+void BleScanner::setActiveScan(bool on) {
+  if (!s_scan) return;
+  s_scan->setActiveScan(on);
+  // Restart the scan so the new mode takes effect immediately.
+  if (scanning_) {
+    s_scan->stop();
+    delay(10);
     s_scan->start(BLE_SCAN_DURATION, nullptr, false);
   }
 }

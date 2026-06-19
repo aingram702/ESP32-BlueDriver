@@ -10,7 +10,8 @@ class BleScanner {
   void start();
   void stop();
   bool scanning() const { return scanning_; }
-  void tick();              // call from loop(): restarts scan if it stopped
+  void tick();                  // call from loop(): restarts scan if it stopped
+  void setActiveScan(bool on);  // apply the active-scan toggle at runtime
 
  private:
   bool scanning_ = false;

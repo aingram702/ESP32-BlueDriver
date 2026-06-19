@@ -8,7 +8,6 @@
 #pragma once
 #include <Arduino.h>
 #include <unordered_map>
-#include <vector>
 #include "config.h"
 
 // --- PSRAM allocator so the (potentially large) device map lives in PSRAM ----
@@ -52,7 +51,6 @@ struct BleDevice {
   double   lon;
   float    alt;
   bool     hasGps;
-  uint32_t uplinkedAt;                // lastSeen value at last successful uplink
 };
 
 using DeviceMap =
@@ -96,17 +94,6 @@ class DeviceStore {
   // Persistence (LittleFS)
   bool saveCsv(const char* path);
   bool loadCsv(const char* path);
-
-  // --- Uplink support ---
-  // Build a JSON array of up to maxItems devices that are new or have been seen
-  // again since their last successful uplink. Captures their keys in outKeys so
-  // they can be marked once the POST succeeds. Returns the number included.
-  size_t buildUplinkBatch(String& outDevicesJson,
-                          std::vector<uint64_t>& outKeys, size_t maxItems);
-  // Mark the given devices as uplinked (records each one's current lastSeen).
-  void   markUplinked(const std::vector<uint64_t>& keys);
-  // How many devices are currently waiting to be uplinked.
-  size_t pendingUplink();
 
  private:
   DeviceMap devices_;
